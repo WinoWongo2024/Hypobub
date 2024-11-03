@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hypobub Tracker</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Hypobub Tracker</h1>
+        </header>
+        <section id="global-data">
+            <h2>Global Data</h2>
+            <p>Infections: <span id="global-infections">0</span></p>
+            <p>R Rate: <span id="global-r-rate">0.00</span></p>
+            <p>Deaths: <span id="global-deaths">0</span></p>
+            <p>Recoveries: <span id="global-recoveries">0</span></p>
+        </section>
+        <section id="local-data">
+            <h2>Your Country's Data</h2>
+            <p>Country: <span id="user-country">Detecting...</span></p>
+            <p>Infections: <span id="local-infections">0</span></p>
+            <p>R Rate: <span id="local-r-rate">0.00</span></p>
+            <p>Deaths: <span id="local-deaths">0</span></p>
+            <p>Recoveries: <span id="local-recoveries">0</span></p>
+        </section>
+        <section id="country-list">
+            <h2>Data by Country</h2>
+            <select id="country-select">
+                <!-- Countries will be loaded dynamically -->
+            </select>
+            <div id="country-data">
+                <p>Infections: <span id="country-infections">0</span></p>
+                <p>R Rate: <span id="country-r-rate">0.00</span></p>
+                <p>Deaths: <span id="country-deaths">0</span></p>
+                <p>Recoveries: <span id="country-recoveries">0</span></p>
+            </div>
+        </section>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
