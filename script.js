@@ -1,17 +1,78 @@
 document.addEventListener("DOMContentLoaded", () => {
-    const countries = ["France", "Germany", "Italy", "Spain", "United Kingdom", /* more European countries */];
+    const countries = ["France", "Germany", "Italy", "Spain", "United Kingdom"];
+    const countryFactors = initializeCountryFactors(countries);
 
-    // Initialize or load data based on date range if not already set
+    // Initialize or load data for the current date
+    const today = getTodayDateString();
     let globalData = JSON.parse(localStorage.getItem("globalData"));
-    if (!globalData || isNewDataNeeded()) {
-        globalData = initializeDataForDate();
+    const lastUpdate = localStorage.getItem("lastUpdate");
+
+    if (!globalData || lastUpdate !== today) {
+        globalData = generateDailyData();
         localStorage.setItem("globalData", JSON.stringify(globalData));
+        localStorage.setItem("lastUpdate", today);
     }
 
-    // Display global data
+    // Display data
     updateGlobalData(globalData);
+    populateCountryDropdown(countries);
+    setUserLocationData(globalData, countryFactors);
+});
 
-    // Populate country dropdown
+// Utility Functions
+function getTodayDateString() {
+    return new Date().toISOString().split('T')[0];
+}
+
+// Initialize country-specific variability factors
+function initializeCountryFactors(countries) {
+    const factors = {};
+    countries.forEach(country => {
+        factors[country] = {
+            infectionRate: 0.8 + Math.random() * 0.4,  // 80%-120% of global rate
+            deathRate: 0.9 + Math.random() * 0.2,      // 90%-110% of global rate
+            recoveryRate: 0.7 + Math.random() * 0.3    // 70%-100% of global rate
+        };
+    });
+    return factors;
+}
+
+// Generate daily data with advanced growth model
+function generateDailyData() {
+    const startDate = new Date(new Date().getFullYear(), 10, 1); // 1st November
+    const daysElapsed = Math.floor((new Date() - startDate) / (1000 * 60 * 60 * 24));
+    
+    let infections = 1000;  // Initial base value
+    let deaths = 0;
+    let recoveries = 0;
+
+    for (let i = 0; i < daysElapsed; i++) {
+        const infectionGrowthRate = generateGrowthRate(0.0001, 1, 0.12);
+        const deathGrowthRate = generateGrowthRate(0, 0.0002, 0.0001);
+
+        infections += Math.floor(infections * infectionGrowthRate);
+        deaths += Math.floor(infections * deathGrowthRate);
+        recoveries = Math.floor(infections * 0.75); // 75% assumed recovery rate
+    }
+
+    const rRate = calculateRRate(infections);
+
+    return { infections, rRate, deaths, recoveries };
+}
+
+// Generate a random growth rate with min, max, and target average
+function generateGrowthRate(min, max, avg) {
+    const randomnessFactor = Math.random() * (max - min) + min;
+    return randomnessFactor * (0.8 + Math.random() * 0.4);  // Adjust around avg
+}
+
+// Calculate R rate based on infections
+function calculateRRate(infections) {
+    return (1 + infections / 100000).toFixed(2);
+}
+
+// Populate country dropdown in the UI
+function populateCountryDropdown(countries) {
     const countrySelect = document.getElementById("country-select");
     countries.forEach(country => {
         let option = document.createElement("option");
@@ -20,99 +81,85 @@ document.addEventListener("DOMContentLoaded", () => {
         countrySelect.appendChild(option);
     });
 
-    // Set user location data
+    countrySelect.addEventListener("change", (e) => {
+        const countryData = generateDataForCountry(e.target.value);
+        updateCountryData(countryData);
+    });
+}
+
+// Set user location data
+function setUserLocationData(globalData, countryFactors) {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(async (position) => {
             const country = await getCountryByCoordinates(position.coords.latitude, position.coords.longitude);
             document.getElementById("user-country").textContent = country;
-            const localData = generateDataForCountry(globalData);
+            const localData = generateDataForCountry(country, countryFactors[country]);
             updateLocalData(localData);
-        });
+        }, handleGeolocationError);
+    } else {
+        handleGeolocationError();
     }
-
-    // Update selected country data
-    countrySelect.addEventListener("change", () => {
-        const countryData = generateDataForCountry(globalData);
-        updateCountryData(countryData);
-    });
-});
-
-// Check if data update is required based on the date range
-function isNewDataNeeded() {
-    const today = new Date();
-    const startDate = new Date(today.getFullYear(), 10, 1); // 1st Nov
-    const endDate = new Date(today.getFullYear(), 10, 29);  // 29th Nov
-    return today < startDate || today > endDate;
 }
 
-// Generate data based on the date range
-function initializeDataForDate() {
-    const today = new Date();
-    const startDate = new Date(today.getFullYear(), 10, 1); // 1st Nov
-    const daysElapsed = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
-
-    let infections = 1000; // Starting point for infections
-    let deaths = 0; // Starting point for deaths
-
-    // Calculate daily growth from 1st Nov to today
-    for (let i = 0; i < daysElapsed; i++) {
-        // Daily infection growth rate between 0.01% and 100%, averaging around 12%
-        const infectionGrowthRate = Math.min(1, Math.max(0.0001, 0.12 * (0.8 + Math.random() * 0.4)));
-        infections += Math.floor(infections * infectionGrowthRate);
-
-        // Daily death growth rate between 0.00% and 0.02%
-        const deathGrowthRate = Math.min(0.0002, Math.max(0, 0.0001 * (0.8 + Math.random() * 0.4)));
-        deaths += Math.floor(infections * deathGrowthRate);
-    }
-
+// Generate data for a specific country with variability factors
+function generateDataForCountry(country, factors) {
+    const globalData = JSON.parse(localStorage.getItem("globalData"));
     return {
-        infections,
-        rRate: calculateRRate(infections),
-        deaths,
-        recoveries: calculateRecoveries(infections)
+        infections: Math.floor(globalData.infections * factors.infectionRate),
+        rRate: (globalData.rRate * factors.infectionRate).toFixed(2),
+        deaths: Math.floor(globalData.deaths * factors.deathRate),
+        recoveries: Math.floor(globalData.recoveries * factors.recoveryRate)
     };
 }
 
-function calculateRRate(infections) {
-    return (1 + infections / 100000).toFixed(2); // Example formula for R rate
-}
-
-function calculateRecoveries(infections) {
-    return Math.floor(infections * 0.75); // Assume 75% recovery rate
-}
-
-function generateDataForCountry(globalData) {
-    return {
-        infections: Math.floor(globalData.infections * (0.8 + Math.random() * 0.4)), // Randomly adjust by ±20%
-        rRate: (globalData.rRate * (0.9 + Math.random() * 0.2)).toFixed(2),
-        deaths: Math.floor(globalData.deaths * (0.8 + Math.random() * 0.4)),
-        recoveries: Math.floor(globalData.recoveries * (0.8 + Math.random() * 0.4))
-    };
-}
-
-// Update functions
+// Update UI functions with smooth transitions
 function updateGlobalData(data) {
-    document.getElementById("global-infections").textContent = data.infections;
-    document.getElementById("global-r-rate").textContent = data.rRate;
-    document.getElementById("global-deaths").textContent = data.deaths;
-    document.getElementById("global-recoveries").textContent = data.recoveries;
+    smoothUpdate("global-infections", data.infections);
+    smoothUpdate("global-r-rate", data.rRate);
+    smoothUpdate("global-deaths", data.deaths);
+    smoothUpdate("global-recoveries", data.recoveries);
 }
 
 function updateLocalData(data) {
-    document.getElementById("local-infections").textContent = data.infections;
-    document.getElementById("local-r-rate").textContent = data.rRate;
-    document.getElementById("local-deaths").textContent = data.deaths;
-    document.getElementById("local-recoveries").textContent = data.recoveries;
+    smoothUpdate("local-infections", data.infections);
+    smoothUpdate("local-r-rate", data.rRate);
+    smoothUpdate("local-deaths", data.deaths);
+    smoothUpdate("local-recoveries", data.recoveries);
 }
 
 function updateCountryData(data) {
-    document.getElementById("country-infections").textContent = data.infections;
-    document.getElementById("country-r-rate").textContent = data.rRate;
-    document.getElementById("country-deaths").textContent = data.deaths;
-    document.getElementById("country-recoveries").textContent = data.recoveries;
+    smoothUpdate("country-infections", data.infections);
+    smoothUpdate("country-r-rate", data.rRate);
+    smoothUpdate("country-deaths", data.deaths);
+    smoothUpdate("country-recoveries", data.recoveries);
 }
 
+// Smoothly animate data updates
+function smoothUpdate(elementId, newValue) {
+    const element = document.getElementById(elementId);
+    let currentValue = parseInt(element.textContent) || 0;
+    const step = (newValue - currentValue) / 50;
+
+    let count = 0;
+    const interval = setInterval(() => {
+        currentValue += step;
+        element.textContent = Math.round(currentValue);
+        if (++count >= 50) clearInterval(interval);
+    }, 20);
+}
+
+// Handle geolocation errors gracefully
+function handleGeolocationError() {
+    document.getElementById("user-country").textContent = "Location unavailable";
+    updateLocalData({
+        infections: "N/A",
+        rRate: "N/A",
+        deaths: "N/A",
+        recoveries: "N/A"
+    });
+}
+
+// Placeholder function for geolocation API
 async function getCountryByCoordinates(lat, lon) {
-    // Simplified for example - use a geolocation API if needed
-    return "United Kingdom";  // Placeholder
+    return "United Kingdom";  // For demo, replace with actual API
 }
