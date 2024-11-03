@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     const countries = ["France", "Germany", "Italy", "Spain", "United Kingdom", /* more European countries */];
 
-    // Initialize data based on date range if not already set
+    // Initialize or load data based on date range if not already set
     let globalData = JSON.parse(localStorage.getItem("globalData"));
     if (!globalData || isNewDataNeeded()) {
         globalData = initializeDataForDate();
@@ -41,7 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
 function isNewDataNeeded() {
     const today = new Date();
     const startDate = new Date(today.getFullYear(), 10, 1); // 1st Nov
-    const endDate = new Date(today.getFullYear(), 10, 28);  // 28th Nov
+    const endDate = new Date(today.getFullYear(), 10, 29);  // 29th Nov
     return today < startDate || today > endDate;
 }
 
@@ -50,22 +50,31 @@ function initializeDataForDate() {
     const today = new Date();
     const startDate = new Date(today.getFullYear(), 10, 1); // 1st Nov
     const daysElapsed = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
-    const infections = Math.floor((90287 / 28) * daysElapsed); // Linearly scale infections
+
+    let infections = 1000; // Starting point for infections
+    let deaths = 0; // Starting point for deaths
+
+    // Calculate daily growth from 1st Nov to today
+    for (let i = 0; i < daysElapsed; i++) {
+        // Daily infection growth rate between 0.01% and 100%, averaging around 12%
+        const infectionGrowthRate = Math.min(1, Math.max(0.0001, 0.12 * (0.8 + Math.random() * 0.4)));
+        infections += Math.floor(infections * infectionGrowthRate);
+
+        // Daily death growth rate between 0.00% and 0.02%
+        const deathGrowthRate = Math.min(0.0002, Math.max(0, 0.0001 * (0.8 + Math.random() * 0.4)));
+        deaths += Math.floor(infections * deathGrowthRate);
+    }
 
     return {
         infections,
         rRate: calculateRRate(infections),
-        deaths: calculateDeaths(infections),
+        deaths,
         recoveries: calculateRecoveries(infections)
     };
 }
 
 function calculateRRate(infections) {
-    return (1 + infections / 100000).toFixed(2); // Example formula
-}
-
-function calculateDeaths(infections) {
-    return Math.floor(infections * 0.02); // Assume 2% mortality rate
+    return (1 + infections / 100000).toFixed(2); // Example formula for R rate
 }
 
 function calculateRecoveries(infections) {
@@ -74,10 +83,10 @@ function calculateRecoveries(infections) {
 
 function generateDataForCountry(globalData) {
     return {
-        infections: Math.floor(globalData.infections * Math.random()),
-        rRate: (globalData.rRate * Math.random()).toFixed(2),
-        deaths: Math.floor(globalData.deaths * Math.random()),
-        recoveries: Math.floor(globalData.recoveries * Math.random())
+        infections: Math.floor(globalData.infections * (0.8 + Math.random() * 0.4)), // Randomly adjust by ±20%
+        rRate: (globalData.rRate * (0.9 + Math.random() * 0.2)).toFixed(2),
+        deaths: Math.floor(globalData.deaths * (0.8 + Math.random() * 0.4)),
+        recoveries: Math.floor(globalData.recoveries * (0.8 + Math.random() * 0.4))
     };
 }
 
