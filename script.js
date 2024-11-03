@@ -2,29 +2,27 @@ document.addEventListener("DOMContentLoaded", () => {
     const countries = ["France", "Germany", "Italy", "Spain", "United Kingdom"];
     const countryFactors = initializeCountryFactors(countries);
 
-    // Initialize or load data for the current date
-    const today = getTodayDateString();
-    let globalData = JSON.parse(localStorage.getItem("globalData"));
-    const lastUpdate = localStorage.getItem("lastUpdate");
-
-    if (!globalData || lastUpdate !== today) {
-        globalData = generateDailyData();
-        localStorage.setItem("globalData", JSON.stringify(globalData));
-        localStorage.setItem("lastUpdate", today);
-    }
-
-    // Display data
+    // Initialize global data with base values
+    let globalData = JSON.parse(localStorage.getItem("globalData")) || {
+        infections: 1000,
+        deaths: 0,
+        recoveries: 0,
+        rRate: 1.05
+    };
     updateGlobalData(globalData);
+
+    // Set the data to update every second
+    setInterval(() => {
+        globalData = updateDataEverySecond(globalData);
+        localStorage.setItem("globalData", JSON.stringify(globalData));
+        updateGlobalData(globalData);
+    }, 1000);
+
     populateCountryDropdown(countries);
     setUserLocationData(globalData, countryFactors);
 });
 
-// Utility Functions
-function getTodayDateString() {
-    return new Date().toISOString().split('T')[0];
-}
-
-// Initialize country-specific variability factors
+// Utility function to initialize variability factors for each country
 function initializeCountryFactors(countries) {
     const factors = {};
     countries.forEach(country => {
@@ -37,27 +35,17 @@ function initializeCountryFactors(countries) {
     return factors;
 }
 
-// Generate daily data with advanced growth model
-function generateDailyData() {
-    const startDate = new Date(new Date().getFullYear(), 10, 1); // 1st November
-    const daysElapsed = Math.floor((new Date() - startDate) / (1000 * 60 * 60 * 24));
-    
-    let infections = 1000;  // Initial base value
-    let deaths = 0;
-    let recoveries = 0;
+// Function to update data every second with a random growth rate
+function updateDataEverySecond(data) {
+    const infectionGrowthRate = generateGrowthRate(0.0001, 1, 0.2);  // 0.01%-100% with an average of 20%
+    const deathGrowthRate = generateGrowthRate(0.00001, 0.0002, 0.0001);  // 0.001%-0.02% with a small average
 
-    for (let i = 0; i < daysElapsed; i++) {
-        const infectionGrowthRate = generateGrowthRate(0.0001, 1, 0.12);
-        const deathGrowthRate = generateGrowthRate(0, 0.0002, 0.0001);
+    data.infections += Math.floor(data.infections * infectionGrowthRate);
+    data.deaths += Math.floor(data.infections * deathGrowthRate);
+    data.recoveries = Math.floor(data.infections * 0.75);  // Assume 75% recovery rate
+    data.rRate = calculateRRate(data.infections);
 
-        infections += Math.floor(infections * infectionGrowthRate);
-        deaths += Math.floor(infections * deathGrowthRate);
-        recoveries = Math.floor(infections * 0.75); // 75% assumed recovery rate
-    }
-
-    const rRate = calculateRRate(infections);
-
-    return { infections, rRate, deaths, recoveries };
+    return data;
 }
 
 // Generate a random growth rate with min, max, and target average
